@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import '@react-pdf-viewer/core/lib/styles/index.css';
@@ -84,6 +84,42 @@ export default function Home() {
     setModalOpen(false);
   };
 
+  const selectionTimeout = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      if (selectionTimeout.current) {
+        window.clearTimeout(selectionTimeout.current);
+      }
+
+      selectionTimeout.current = window.setTimeout(async () => {
+        const selection = window.getSelection()?.toString().trim() || '';
+        if (!selection || selection === lastSelection) {
+          return;
+        }
+
+        setLastSelection(selection);
+        const wordCount = selection.split(/\s+/).filter(Boolean).length;
+
+        if (wordCount > 2) {
+          setEventMessage('Seleccionaste más de dos palabras. Consultando IA para explicar la frase...');
+          await fetchAIResponse(selection, 'explain');
+        } else {
+          setEventMessage('Seleccionaste una palabra o frase corta. Consultando traductor...');
+          await fetchAIResponse(selection, 'translate');
+        }
+      }, 200);
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      if (selectionTimeout.current) {
+        window.clearTimeout(selectionTimeout.current);
+      }
+    };
+  }, [fetchAIResponse, lastSelection]);
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -131,7 +167,7 @@ export default function Home() {
         </div>
 
         {pdfFile ? (
-          <div className="flex-1 overflow-auto" onMouseUp={handleTextSelection}>
+          <div className="flex-1 overflow-auto" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
             <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.0.279/pdf.worker.min.js">
               <Viewer
                 fileUrl={pdfFile}
