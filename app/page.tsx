@@ -62,63 +62,86 @@ export default function Home() {
     }
   };
 
-  const handleTextSelection = async () => {
-    const selection = window.getSelection()?.toString().trim() || '';
-    if (!selection || selection === lastSelection) {
-      return;
-    }
-
-    setLastSelection(selection);
-    const wordCount = selection.split(/\s+/).filter(Boolean).length;
-
-    if (wordCount > 2) {
-      setEventMessage('Seleccionaste más de dos palabras. Consultando IA para explicar la frase...');
-      await fetchAIResponse(selection, 'explain');
-    } else {
-      setEventMessage('Seleccionaste una palabra o frase corta. Consultando traductor...');
-      await fetchAIResponse(selection, 'translate');
-    }
-  };
-
   const closeModal = () => {
     setModalOpen(false);
   };
 
-  const selectionTimeout = useRef<number | null>(null);
+const selectionTimeout = useRef<number | null>(null);
+const lastSelectionRef = useRef('');
 
-  useEffect(() => {
-    const handleSelectionChange = () => {
-      if (selectionTimeout.current) {
-        window.clearTimeout(selectionTimeout.current);
+useEffect(() => {
+  const handleSelectionChange = () => {
+    console.log(
+      'selectionchange:',
+      window.getSelection()?.toString()
+    );
+
+    if (selectionTimeout.current) {
+      window.clearTimeout(selectionTimeout.current);
+    }
+
+    selectionTimeout.current = window.setTimeout(async () => {
+      const selection =
+        window.getSelection()?.toString().trim() || '';
+
+      console.log('Texto seleccionado:', selection);
+
+      if (
+        !selection ||
+        selection === lastSelectionRef.current
+      ) {
+        return;
       }
 
-      selectionTimeout.current = window.setTimeout(async () => {
-        const selection = window.getSelection()?.toString().trim() || '';
-        if (!selection || selection === lastSelection) {
-          return;
-        }
+      lastSelectionRef.current = selection;
+      setLastSelection(selection);
 
-        setLastSelection(selection);
-        const wordCount = selection.split(/\s+/).filter(Boolean).length;
+      const wordCount = selection
+        .split(/\s+/)
+        .filter(Boolean).length;
 
-        if (wordCount > 2) {
-          setEventMessage('Seleccionaste más de dos palabras. Consultando IA para explicar la frase...');
-          await fetchAIResponse(selection, 'explain');
-        } else {
-          setEventMessage('Seleccionaste una palabra o frase corta. Consultando traductor...');
-          await fetchAIResponse(selection, 'translate');
-        }
-      }, 200);
-    };
+      if (wordCount > 2) {
+        setEventMessage(
+          'Seleccionaste más de dos palabras. Consultando IA para explicar la frase...'
+        );
 
-    document.addEventListener('selectionchange', handleSelectionChange);
-    return () => {
-      document.removeEventListener('selectionchange', handleSelectionChange);
-      if (selectionTimeout.current) {
-        window.clearTimeout(selectionTimeout.current);
+        await fetchAIResponse(selection, 'explain');
+      } else {
+        setEventMessage(
+          'Seleccionaste una palabra o frase corta. Consultando traductor...'
+        );
+
+        await fetchAIResponse(selection, 'translate');
       }
-    };
-  }, [fetchAIResponse, lastSelection]);
+    }, 500);
+  };
+
+  document.addEventListener(
+    'selectionchange',
+    handleSelectionChange
+  );
+
+  document.addEventListener(
+    'touchend',
+    handleSelectionChange
+  );
+
+  return () => {
+    document.removeEventListener(
+      'selectionchange',
+      handleSelectionChange
+    );
+
+    document.removeEventListener(
+      'touchend',
+      handleSelectionChange
+    );
+
+    if (selectionTimeout.current) {
+      window.clearTimeout(selectionTimeout.current);
+    }
+  };
+}, []);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -167,7 +190,7 @@ export default function Home() {
         </div>
 
         {pdfFile ? (
-          <div className="flex-1 overflow-auto" onMouseUp={handleTextSelection} onTouchEnd={handleTextSelection}>
+          <div className="flex-1 overflow-auto">
             <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.0.279/pdf.worker.min.js">
               <Viewer
                 fileUrl={pdfFile}
