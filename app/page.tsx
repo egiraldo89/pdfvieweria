@@ -70,6 +70,7 @@ const selectionTimeout = useRef<number | null>(null);
 const lastSelectionRef = useRef('');
 
 useEffect(() => {
+  console.log('Setting up selection listeners');
   const handleSelectionChange = () => {
     console.log(
       'selectionchange:',
@@ -85,7 +86,7 @@ useEffect(() => {
         window.getSelection()?.toString().trim() || '';
 
         alert('Texto seleccionado: ' + selection);
-        
+
       console.log('Texto seleccionado:', selection);
 
       if (
