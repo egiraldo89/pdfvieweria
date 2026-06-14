@@ -85,6 +85,7 @@ useEffect(() => {
         window.getSelection()?.toString().trim() || '';
 
         alert('Texto seleccionado: ' + selection);
+        
       console.log('Texto seleccionado:', selection);
 
       if (
