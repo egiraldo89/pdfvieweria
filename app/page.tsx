@@ -84,6 +84,8 @@ useEffect(() => {
       const selection =
         window.getSelection()?.toString().trim() || '';
 
+      console.log('Texto seleccionado:', selection);
+
       if (
         !selection ||
         selection === lastSelectionRef.current
