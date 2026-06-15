@@ -17,6 +17,9 @@ export default function Home() {
   const [lastSelection, setLastSelection] = useState('');
   const [modalPosition, setModalPosition] = useState<{ top: number; left: number } | null>(null);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [showConfirmSmall, setShowConfirmSmall] = useState(false);
+  const [pendingExplain, setPendingExplain] = useState<string | null>(null);
+  const [pendingExplainPos, setPendingExplainPos] = useState<{ top: number; left: number } | null>(null);
   const autoCloseTimer = useRef<number | null>(null);
   const defaultCloseTimer = useRef<number | null>(null);
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
@@ -96,6 +99,21 @@ export default function Home() {
     setIsFadingOut(false);
   };
 
+  const confirmExplain = async () => {
+    if (!pendingExplain) return;
+    const text = pendingExplain;
+    setShowConfirmSmall(false);
+    setPendingExplain(null);
+    setPendingExplainPos(null);
+    await fetchAIResponse(text, 'explain');
+  };
+
+  const cancelExplain = () => {
+    setShowConfirmSmall(false);
+    setPendingExplain(null);
+    setPendingExplainPos(null);
+  };
+
 const selectionTimeout = useRef<number | null>(null);
 const lastSelectionRef = useRef('');
 
@@ -132,10 +150,23 @@ useEffect(() => {
 
       if (wordCount > 2) {
         setEventMessage(
-          'Seleccionaste más de dos palabras. Consultando IA para explicar la frase...'
+          'Seleccionaste más de dos palabras. Confirma para solicitar explicación...'
         );
         setModalPosition(null);
-        await fetchAIResponse(selection, 'explain');
+        // Show small confirmation modal (OK to request explanation)
+        const range = window.getSelection()?.getRangeAt(0);
+        if (range) {
+          const rect = range.getBoundingClientRect();
+          if (rect && rect.width && rect.height) {
+            setPendingExplainPos({ top: Math.max(rect.top - 40, 8), left: rect.left + rect.width / 2 });
+          } else {
+            setPendingExplainPos(null);
+          }
+        } else {
+          setPendingExplainPos(null);
+        }
+        setPendingExplain(selection);
+        setShowConfirmSmall(true);
       } else {
         setEventMessage(
           'Seleccionaste una palabra o frase corta. Consultando traductor...'
@@ -145,7 +176,7 @@ useEffect(() => {
           const rect = range.getBoundingClientRect();
           if (rect && rect.width && rect.height) {
             setModalPosition({
-              top: Math.max(rect.top - 100, 8),
+              top: Math.max(rect.top - 180, 8),
               left: rect.left + rect.width / 2,
             });
           } else {
@@ -302,6 +333,29 @@ useEffect(() => {
           </div>
           <div className="mt-3 text-sm leading-6 text-slate-800 whitespace-pre-wrap">
             {isLoading ? 'Cargando respuesta...' : modalContent}
+          </div>
+        </div>
+      )}
+
+      {showConfirmSmall && pendingExplain && (
+        <div
+          className="fixed z-50"
+          style={
+            pendingExplainPos
+              ? {
+                  top: pendingExplainPos.top,
+                  left: pendingExplainPos.left,
+                  transform: 'translateX(-50%)',
+                }
+              : { top: 120, left: '50%', transform: 'translateX(-50%)' }
+          }
+        >
+          <div className="bg-white border border-slate-200 rounded-md p-3 shadow-md w-56 text-center">
+            <div className="text-sm text-slate-700 mb-2">Solicitar explicación para la selección?</div>
+            <div className="flex justify-center gap-2">
+              <button onClick={confirmExplain} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">OK</button>
+              <button onClick={cancelExplain} className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-sm">Cancelar</button>
+            </div>
           </div>
         </div>
       )}
