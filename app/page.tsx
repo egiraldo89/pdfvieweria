@@ -22,7 +22,7 @@ export default function Home() {
   const [pendingExplainPos, setPendingExplainPos] = useState<{ top: number; left: number } | null>(null);
   const autoCloseTimer = useRef<number | null>(null);
   const defaultCloseTimer = useRef<number | null>(null);
-  const defaultLayoutPluginInstance = defaultLayoutPlugin();
+  const defaultLayoutPluginInstance = defaultLayoutPlugin({ sidebarTabs: () => [] });
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
