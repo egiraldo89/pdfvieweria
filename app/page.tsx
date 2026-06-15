@@ -243,7 +243,6 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      {JSON.stringify(dictionary)}
       <main className="flex-1 overflow-hidden flex flex-col">
         <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3">
