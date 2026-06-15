@@ -2,7 +2,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { translate } from '@vitalets/google-translate-api';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 
@@ -13,6 +12,10 @@ Explain the full meaning of the phrase, the grammar used, and a clear Spanish tr
 
 Respond clearly and briefly, mentioning how it would be translated and which part is grammatically important. Answer in Spanish.`;
 
+const translatePrompt = (text: string) => `Traduce el siguiente texto del inglés al español. Devuelve solo la traducción en español, sin explicaciones adicionales:
+
+"${text}"`;
+
 export async function POST(request: NextRequest) {
   try {
     const { text, type } = await request.json();
@@ -21,10 +24,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === 'translate') {
-      const result = await translate(text, { from: 'en', to: 'es' });
-      return NextResponse.json({
-        result: `Translation: ${result.text}`,
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: translatePrompt(text),
+          },
+        ],
+        max_completion_tokens: 200,
       });
+
+      const translation = completion.choices[0]?.message?.content?.trim() || 'No se obtuvo traducción.';
+      return NextResponse.json({ result: translation });
     }
 
     const prompt = explainPrompt(text);

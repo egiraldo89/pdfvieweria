@@ -15,6 +15,10 @@ export default function Home() {
   const [modalContent, setModalContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastSelection, setLastSelection] = useState('');
+  const [modalPosition, setModalPosition] = useState<{ top: number; left: number } | null>(null);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+  const autoCloseTimer = useRef<number | null>(null);
+  const defaultCloseTimer = useRef<number | null>(null);
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,11 +38,25 @@ export default function Home() {
     }
   };
 
-  const fetchAIResponse = async (text: string, type: 'translate' | 'explain') => {
+  const fetchAIResponse = async (
+    text: string,
+    type: 'translate' | 'explain',
+    autoClose = false
+  ) => {
     setIsLoading(true);
     setModalOpen(true);
+    setIsFadingOut(false);
     setModalTitle(type === 'translate' ? 'Traducción' : 'Explicación AI');
     setModalContent('Consultando el modelo...');
+
+    if (autoClose && autoCloseTimer.current) {
+      window.clearTimeout(autoCloseTimer.current);
+      autoCloseTimer.current = null;
+    }
+    if (defaultCloseTimer.current) {
+      window.clearTimeout(defaultCloseTimer.current);
+      defaultCloseTimer.current = null;
+    }
 
     try {
       const response = await fetch('/api/ai', {
@@ -59,11 +77,23 @@ export default function Home() {
       setModalContent('Error de red al consultar la IA. Intenta nuevamente.');
     } finally {
       setIsLoading(false);
+      if (autoClose) {
+        autoCloseTimer.current = window.setTimeout(() => {
+          setIsFadingOut(true);
+          defaultCloseTimer.current = window.setTimeout(() => {
+            setModalOpen(false);
+            setIsFadingOut(false);
+            defaultCloseTimer.current = null;
+          }, 300);
+          autoCloseTimer.current = null;
+        }, 1000);
+      }
     }
   };
 
   const closeModal = () => {
     setModalOpen(false);
+    setIsFadingOut(false);
   };
 
 const selectionTimeout = useRef<number | null>(null);
@@ -104,14 +134,27 @@ useEffect(() => {
         setEventMessage(
           'Seleccionaste más de dos palabras. Consultando IA para explicar la frase...'
         );
-
+        setModalPosition(null);
         await fetchAIResponse(selection, 'explain');
       } else {
         setEventMessage(
           'Seleccionaste una palabra o frase corta. Consultando traductor...'
         );
-
-        await fetchAIResponse(selection, 'translate');
+        const range = window.getSelection()?.getRangeAt(0);
+        if (range) {
+          const rect = range.getBoundingClientRect();
+          if (rect && rect.width && rect.height) {
+            setModalPosition({
+              top: Math.max(rect.top - 100, 8),
+              left: rect.left + rect.width / 2,
+            });
+          } else {
+            setModalPosition(null);
+          }
+        } else {
+          setModalPosition(null);
+        }
+        await fetchAIResponse(selection, 'translate', true);
       }
     }, 500);
   };
@@ -140,24 +183,23 @@ useEffect(() => {
     if (selectionTimeout.current) {
       window.clearTimeout(selectionTimeout.current);
     }
+
+    if (autoCloseTimer.current) {
+      window.clearTimeout(autoCloseTimer.current);
+      autoCloseTimer.current = null;
+    }
   };
 }, []);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold text-gray-900">PDF Viewer</h1>
-        </div>
-      </header>
-
       <main className="flex-1 overflow-hidden flex flex-col">
         <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition-colors">
+              <label className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md cursor-pointer hover:bg-blue-700 transition-colors text-sm">
                 <svg
-                  className="w-5 h-5"
+                  className="w-4 h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -226,7 +268,26 @@ useEffect(() => {
       </main>
 
       {modalOpen && (
-        <div className="fixed inset-x-0 bottom-6 z-50 mx-auto w-full max-w-[calc(100vw-8rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
+        <div
+          className={`fixed z-50 mx-auto w-full max-w-[calc(100vw-8rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-lg transition-opacity duration-300 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
+          style={
+            modalPosition
+              ? {
+                  top: modalPosition.top,
+                  left: modalPosition.left,
+                  transform: 'translateX(-50%)',
+                  position: 'fixed',
+                  width: 'auto',
+                  minWidth: '18rem',
+                  maxWidth: 'calc(100vw - 4rem)',
+                }
+              : {
+                  top: 24,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                }
+          }
+        >
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-semibold text-slate-900">{modalTitle}</h2>
