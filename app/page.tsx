@@ -5,6 +5,7 @@ import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
+import lodash from 'lodash';
 
 export default function Home() {
   const [pdfFile, setPdfFile] = useState<string | null>(null);
@@ -23,6 +24,8 @@ export default function Home() {
   const autoCloseTimer = useRef<number | null>(null);
   const defaultCloseTimer = useRef<number | null>(null);
   const defaultLayoutPluginInstance = defaultLayoutPlugin({ sidebarTabs: () => [] });
+  const [dictionary, setNewWordToDicctionary] = useState<{ [key: string]: string }>({});
+  const dictionaryRef = useRef<{ [key: string]: string }>({});
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -41,21 +44,26 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    dictionaryRef.current = dictionary;
+  }, [dictionary]);
+
   const fetchAIResponse = async (
     text: string,
     type: 'translate' | 'explain',
     autoClose = false
   ) => {
+    text = text.trim();
     setIsLoading(true);
     setModalOpen(true);
     setIsFadingOut(false);
     setModalTitle(type === 'translate' ? 'Traducción' : 'Explicación AI');
     setModalContent('Consultando el modelo...');
-
     if (autoClose && autoCloseTimer.current) {
       window.clearTimeout(autoCloseTimer.current);
       autoCloseTimer.current = null;
     }
+
     if (defaultCloseTimer.current) {
       window.clearTimeout(defaultCloseTimer.current);
       defaultCloseTimer.current = null;
@@ -74,6 +82,15 @@ export default function Home() {
       if (!response.ok) {
         setModalContent(`Error: ${data.error || 'No se recibió respuesta del servidor.'}`);
       } else {
+        if (type === 'translate') {
+          console.log('---->', data.result)
+          console.log('Updated dictionary:');
+
+          setNewWordToDicctionary(prev => ({
+            ...prev,
+            [text]: data.result || 'Traducción no disponible'
+          }));
+        }
         setModalContent(data.result || 'No se obtuvo respuesta.');
       }
     } catch (error) {
@@ -114,116 +131,119 @@ export default function Home() {
     setPendingExplainPos(null);
   };
 
-const selectionTimeout = useRef<number | null>(null);
-const lastSelectionRef = useRef('');
+  const selectionTimeout = useRef<number | null>(null);
+  const lastSelectionRef = useRef('');
+  useEffect(() => { console.log('dictionary: ', dictionary); }, [dictionary]);
 
-useEffect(() => {
-  const handleSelectionChange = () => {
-    console.log(
-      'selectionchange:',
-      window.getSelection()?.toString()
-    );
-
-    if (selectionTimeout.current) {
-      window.clearTimeout(selectionTimeout.current);
-    }
-
-    selectionTimeout.current = window.setTimeout(async () => {
-      const selection =
-        window.getSelection()?.toString().trim() || '';
-
-      console.log('Texto seleccionado:', selection);
-
-      if (
-        !selection ||
-        selection === lastSelectionRef.current
-      ) {
-        return;
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      if (selectionTimeout.current) {
+        window.clearTimeout(selectionTimeout.current);
       }
 
-      lastSelectionRef.current = selection;
-      setLastSelection(selection);
+      selectionTimeout.current = window.setTimeout(async () => {
+        const selection =
+          window.getSelection()?.toString().trim() || '';
 
-      const wordCount = selection
-        .split(/\s+/)
-        .filter(Boolean).length;
+        if (!selection) {
+          return;
+        }
 
-      if (wordCount > 2) {
-        setEventMessage(
-          'Seleccionaste más de dos palabras. Confirma para solicitar explicación...'
-        );
-        setModalPosition(null);
-        // Show small confirmation modal (OK to request explanation)
-        const range = window.getSelection()?.getRangeAt(0);
-        if (range) {
-          const rect = range.getBoundingClientRect();
-          if (rect && rect.width && rect.height) {
-            setPendingExplainPos({ top: Math.max(rect.top - 40, 8), left: rect.left + rect.width / 2 });
+        const translation = dictionaryRef.current[selection];
+
+        if (translation) {
+          setLastSelection(selection);
+          setModalContent(translation);
+          setModalOpen(true);
+          setIsLoading(false);
+          return;
+        }
+
+        lastSelectionRef.current = selection;
+        setLastSelection(selection);
+
+        const wordCount = selection
+          .split(/\s+/)
+          .filter(Boolean).length;
+
+        if (wordCount > 2) {
+          setEventMessage(
+            'Seleccionaste más de dos palabras. Confirma para solicitar explicación...'
+          );
+          setModalPosition(null);
+          // Show small confirmation modal (OK to request explanation)
+          const range = window.getSelection()?.getRangeAt(0);
+          if (range) {
+            const rect = range.getBoundingClientRect();
+            if (rect && rect.width && rect.height) {
+              setPendingExplainPos({ top: Math.max(rect.top - 40, 8), left: rect.left + rect.width / 2 });
+            } else {
+              setPendingExplainPos(null);
+            }
           } else {
             setPendingExplainPos(null);
           }
+          setPendingExplain(selection);
+          setShowConfirmSmall(true);
         } else {
-          setPendingExplainPos(null);
-        }
-        setPendingExplain(selection);
-        setShowConfirmSmall(true);
-      } else {
-        setEventMessage(
-          'Seleccionaste una palabra o frase corta. Consultando traductor...'
-        );
-        const range = window.getSelection()?.getRangeAt(0);
-        if (range) {
-          const rect = range.getBoundingClientRect();
-          if (rect && rect.width && rect.height) {
-            setModalPosition({
-              top: Math.max(rect.top - 180, 8),
-              left: rect.left + rect.width / 2,
-            });
+          setEventMessage(
+            'Seleccionaste una palabra o frase corta. Consultando traductor...'
+          );
+          const range = window.getSelection()?.getRangeAt(0);
+          if (range) {
+            const rect = range.getBoundingClientRect();
+            if (rect && rect.width && rect.height) {
+              setModalPosition({
+                top: Math.max(rect.top - 180, 8),
+                left: rect.left + rect.width / 2,
+              });
+            } else {
+              setModalPosition(null);
+            }
           } else {
             setModalPosition(null);
           }
-        } else {
-          setModalPosition(null);
+          await fetchAIResponse(selection, 'translate', true);
         }
-        await fetchAIResponse(selection, 'translate', true);
-      }
-    }, 500);
-  };
+      }, 500);
+    };
 
-  document.addEventListener(
-    'selectionchange',
-    handleSelectionChange
-  );
 
-  document.addEventListener(
-    'touchend',
-    handleSelectionChange
-  );
-
-  return () => {
-    document.removeEventListener(
+    document.addEventListener(
       'selectionchange',
       handleSelectionChange
     );
 
-    document.removeEventListener(
+    document.addEventListener(
       'touchend',
       handleSelectionChange
     );
 
-    if (selectionTimeout.current) {
-      window.clearTimeout(selectionTimeout.current);
-    }
+    return () => {
+      document.removeEventListener(
+        'selectionchange',
+        handleSelectionChange
+      );
 
-    if (autoCloseTimer.current) {
-      window.clearTimeout(autoCloseTimer.current);
-      autoCloseTimer.current = null;
-    }
-  };
-}, []);
+      document.removeEventListener(
+        'touchend',
+        handleSelectionChange
+      );
+
+      if (selectionTimeout.current) {
+        window.clearTimeout(selectionTimeout.current);
+      }
+
+      if (autoCloseTimer.current) {
+        window.clearTimeout(autoCloseTimer.current);
+        autoCloseTimer.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
+      {JSON.stringify(dictionary)}
       <main className="flex-1 overflow-hidden flex flex-col">
         <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3">
@@ -264,7 +284,7 @@ useEffect(() => {
 
         {pdfFile ? (
           <div className="flex-1 overflow-auto">
-            <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.0.279/pdf.worker.min.js">
+            <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js">
               <Viewer
                 fileUrl={pdfFile}
                 plugins={[defaultLayoutPluginInstance]}
@@ -304,19 +324,19 @@ useEffect(() => {
           style={
             modalPosition
               ? {
-                  top: modalPosition.top,
-                  left: modalPosition.left,
-                  transform: 'translateX(-50%)',
-                  position: 'fixed',
-                  width: 'auto',
-                  minWidth: '18rem',
-                  maxWidth: 'calc(100vw - 4rem)',
-                }
+                top: modalPosition.top,
+                left: modalPosition.left,
+                transform: 'translateX(-50%)',
+                position: 'fixed',
+                width: 'auto',
+                minWidth: '18rem',
+                maxWidth: 'calc(100vw - 4rem)',
+              }
               : {
-                  top: 24,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                }
+                top: 24,
+                left: '50%',
+                transform: 'translateX(-50%)',
+              }
           }
         >
           <div className="flex items-start justify-between gap-3">
@@ -343,10 +363,10 @@ useEffect(() => {
           style={
             pendingExplainPos
               ? {
-                  top: pendingExplainPos.top,
-                  left: pendingExplainPos.left,
-                  transform: 'translateX(-50%)',
-                }
+                top: pendingExplainPos.top,
+                left: pendingExplainPos.left,
+                transform: 'translateX(-50%)',
+              }
               : { top: 120, left: '50%', transform: 'translateX(-50%)' }
           }
         >
