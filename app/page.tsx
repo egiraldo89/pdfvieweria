@@ -17,7 +17,7 @@ export default function Home() {
   const [modalContent, setModalContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastSelection, setLastSelection] = useState('');
-  const [modalPosition, setModalPosition] = useState<{ top: number; left: number } | null>(null);
+  const [modalPosition, setModalPosition] = useState<{ top: number; left: number; anchor?: 'above' | 'center' } | null>(null);
   const [textMarkerPos, setTextMarkerPos] = useState<{ top: number; left: number } | null>(null);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [showConfirmSmall, setShowConfirmSmall] = useState(false);
@@ -275,13 +275,14 @@ export default function Home() {
           const range = window.getSelection()?.getRangeAt(0);
           if (range) {
             const rect = range.getBoundingClientRect();
-            if (rect && rect.width && rect.height) {
+              if (rect && rect.width && rect.height) {
               const centerX = rect.left + rect.width / 2;
               const minLeft = 160;
               const maxLeft = Math.max(window.innerWidth - 160, 160);
               setModalPosition({
-                top: Math.max(rect.top - 180, 8),
+                top: rect.top,
                 left: Math.min(Math.max(centerX, minLeft), maxLeft),
+                anchor: 'above',
               });
             } else {
               setModalPosition(null);
@@ -417,7 +418,7 @@ export default function Home() {
                 ? {
                   top: modalPosition.top,
                   left: modalPosition.left,
-                  transform: 'translateX(-50%)',
+                  transform: modalPosition?.anchor === 'above' ? 'translate(-50%, -100%)' : 'translateX(-50%)',
                   position: 'fixed',
                   width: 'auto',
                   minWidth: '18rem',
