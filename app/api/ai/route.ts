@@ -12,7 +12,9 @@ Explain the full meaning of the phrase, the grammar used, and a clear Spanish tr
 
 Respond clearly and briefly, mentioning how it would be translated and which part is grammatically important. Answer in Spanish.`;
 
-const translatePrompt = (text: string) => `Traduce el siguiente texto del inglés al español. Devuelve solo la traducción en español, sin explicaciones adicionales:
+const translatePrompt = (text: string) => `Traduce el siguiente texto del inglés al español. Devuelve solo la 
+traducción en español, sin explicaciones adicionales, si la palabra tiene mas de una traduccion, entonces dame maximo 3
+. Aquí está el texto:
 
 "${text}"`;
 

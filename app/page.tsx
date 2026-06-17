@@ -13,10 +13,12 @@ export default function Home() {
   const [eventMessage, setEventMessage] = useState<string>('');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
+  const [modalType, setModalType] = useState<'translate' | 'explain'>('translate');
   const [modalContent, setModalContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastSelection, setLastSelection] = useState('');
   const [modalPosition, setModalPosition] = useState<{ top: number; left: number } | null>(null);
+  const [textMarkerPos, setTextMarkerPos] = useState<{ top: number; left: number } | null>(null);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [showConfirmSmall, setShowConfirmSmall] = useState(false);
   const [pendingExplain, setPendingExplain] = useState<string | null>(null);
@@ -25,6 +27,7 @@ export default function Home() {
   const [chatInput, setChatInput] = useState('');
   const autoCloseTimer = useRef<number | null>(null);
   const defaultCloseTimer = useRef<number | null>(null);
+  const markerClearTimer = useRef<number | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const defaultLayoutPluginInstance = defaultLayoutPlugin({ sidebarTabs: () => [] });
   const [dictionary, setNewWordToDicctionary] = useState<{ [key: string]: string }>({});
@@ -66,6 +69,7 @@ export default function Home() {
     setIsLoading(true);
     setModalOpen(true);
     setIsFadingOut(false);
+    setModalType(type);
     setModalTitle(type === 'translate' ? 'Traducción' : 'Explicación AI');
     setModalContent('Consultando el modelo...');
     if (autoClose && autoCloseTimer.current) {
@@ -92,9 +96,6 @@ export default function Home() {
         setModalContent(`Error: ${data.error || 'No se recibió respuesta del servidor.'}`);
       } else {
         if (type === 'translate') {
-          console.log('---->', data.result)
-          console.log('Updated dictionary:');
-
           setNewWordToDicctionary(prev => ({
             ...prev,
             [text]: data.result || 'Traducción no disponible'
@@ -115,7 +116,7 @@ export default function Home() {
             defaultCloseTimer.current = null;
           }, 300);
           autoCloseTimer.current = null;
-        }, 1000);
+        }, 3000);
       }
     }
   };
@@ -125,6 +126,15 @@ export default function Home() {
     setIsFadingOut(false);
     setChatMessages([]);
     setChatInput('');
+    
+    if (markerClearTimer.current) {
+      window.clearTimeout(markerClearTimer.current);
+    }
+    
+    markerClearTimer.current = window.setTimeout(() => {
+      setTextMarkerPos(null);
+      markerClearTimer.current = null;
+    }, 3000);
   };
 
   const sendChatMessage = async () => {
@@ -134,7 +144,6 @@ export default function Home() {
     setChatInput('');
     setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsLoading(true);
-console.log('lastSelection', lastSelection);
     try {
       const response = await fetch('/api/ai-chat', {
         method: 'POST',
@@ -168,6 +177,20 @@ console.log('lastSelection', lastSelection);
     setShowConfirmSmall(false);
     setPendingExplain(null);
     setPendingExplainPos(null);
+
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect && rect.width && rect.height) {
+        setTextMarkerPos({
+          top: rect.bottom + 4,
+          left: rect.right,
+        });
+      }
+      selection.removeAllRanges();
+    }
+
     await fetchAIResponse(text, 'explain');
   };
 
@@ -179,7 +202,6 @@ console.log('lastSelection', lastSelection);
 
   const selectionTimeout = useRef<number | null>(null);
   const lastSelectionRef = useRef('');
-  useEffect(() => { console.log('dictionary: ', dictionary); }, [dictionary]);
 
   useEffect(() => {
     const handleSelectionChange = () => {
@@ -239,9 +261,12 @@ console.log('lastSelection', lastSelection);
           if (range) {
             const rect = range.getBoundingClientRect();
             if (rect && rect.width && rect.height) {
+              const centerX = rect.left + rect.width / 2;
+              const minLeft = 160;
+              const maxLeft = Math.max(window.innerWidth - 160, 160);
               setModalPosition({
                 top: Math.max(rect.top - 180, 8),
-                left: rect.left + rect.width / 2,
+                left: Math.min(Math.max(centerX, minLeft), maxLeft),
               });
             } else {
               setModalPosition(null);
@@ -328,7 +353,12 @@ console.log('lastSelection', lastSelection);
         </div>
 
         {pdfFile ? (
-          <div className="flex-1 overflow-auto">
+          <div 
+            className="flex-1 overflow-auto"
+            style={{
+              WebkitTouchCallout: 'none',
+            }}
+          >
             <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js">
               <Viewer
                 fileUrl={pdfFile}
@@ -364,34 +394,35 @@ console.log('lastSelection', lastSelection);
       </main>
 
       {modalOpen && (
-        <div
-          className={`fixed z-50 mx-auto w-full max-w-[calc(100vw-8rem)] rounded-xl border border-slate-200 bg-white shadow-lg transition-opacity duration-300 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
-          style={
-            modalPosition
-              ? {
-                top: modalPosition.top,
-                left: modalPosition.left,
-                transform: 'translateX(-50%)',
-                position: 'fixed',
-                width: 'auto',
-                minWidth: '18rem',
-                maxWidth: 'calc(100vw - 4rem)',
-                maxHeight: 'calc(100vh - 2rem)',
-                WebkitOverflowScrolling: 'touch',
-                display: 'flex',
-                flexDirection: 'column',
-              }
-              : {
-                top: 24,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                maxHeight: 'calc(100vh - 2rem)',
-                WebkitOverflowScrolling: 'touch',
-                display: 'flex',
-                flexDirection: 'column',
-              }
-          }
-        >
+        <>
+          <div
+            className={`fixed z-50 mx-auto w-full max-w-[calc(100vw-8rem)] rounded-xl border border-slate-200 bg-white shadow-lg transition-opacity duration-300 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
+            style={
+              modalPosition
+                ? {
+                  top: modalPosition.top,
+                  left: modalPosition.left,
+                  transform: 'translateX(-50%)',
+                  position: 'fixed',
+                  width: 'auto',
+                  minWidth: '18rem',
+                  maxWidth: 'calc(100vw - 4rem)',
+                  maxHeight: 'calc(100vh - 2rem)',
+                  WebkitOverflowScrolling: 'touch',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }
+                : {
+                  top: 24,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  maxHeight: 'calc(100vh - 2rem)',
+                  WebkitOverflowScrolling: 'touch',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }
+            }
+          >
           <div className="border-b border-slate-200 px-4 py-3">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -410,7 +441,7 @@ console.log('lastSelection', lastSelection);
             <div className="text-sm leading-6 text-slate-800 whitespace-pre-wrap">
               {isLoading && chatMessages.length === 0 ? 'Cargando respuesta...' : modalContent}
             </div>
-            {chatMessages.length > 0 && (
+            {modalType === 'explain' && chatMessages.length > 0 && (
               <div ref={chatContainerRef} className="mt-4 max-h-64 overflow-y-auto border-t border-slate-200 pt-3">
                 {chatMessages.map((msg, idx) => (
                   <div key={idx} className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
@@ -427,27 +458,41 @@ console.log('lastSelection', lastSelection);
               </div>
             )}
           </div>
-          <div className="border-t border-slate-200 px-4 py-3">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-                placeholder="Haz una pregunta sobre esto..."
-                className="flex-1 min-w-0 rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
-                disabled={isLoading}
-              />
-              <button
-                onClick={sendChatMessage}
-                disabled={isLoading || !chatInput.trim()}
-                className="flex-shrink-0 rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Enviar
-              </button>
+          {modalType === 'explain' && (
+            <div className="border-t border-slate-200 px-4 py-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+                  placeholder="Haz una pregunta sobre esto..."
+                  className="flex-1 min-w-0 rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                  disabled={isLoading}
+                />
+                <button
+                  onClick={sendChatMessage}
+                  disabled={isLoading || !chatInput.trim()}
+                  className="flex-shrink-0 rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Enviar
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
+      </>
+      )}
+
+      {textMarkerPos && (
+        <div
+          className="fixed z-40 h-3 w-3 rounded-full bg-blue-600 shadow-lg"
+          style={{
+            top: textMarkerPos.top,
+            left: textMarkerPos.left,
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
       )}
 
       {showConfirmSmall && pendingExplain && (
