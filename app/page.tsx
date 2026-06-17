@@ -204,6 +204,20 @@ export default function Home() {
   const lastSelectionRef = useRef('');
 
   useEffect(() => {
+    const handleContextMenu = (e: Event) => {
+      if (pdfFile) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu, true);
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu, true);
+    };
+  }, [pdfFile]);
+
+  useEffect(() => {
     const handleSelectionChange = () => {
       if (selectionTimeout.current) {
         window.clearTimeout(selectionTimeout.current);
@@ -357,7 +371,7 @@ export default function Home() {
             className="flex-1 overflow-auto"
             style={{
               WebkitTouchCallout: 'none',
-            }}
+            } as React.CSSProperties}
           >
             <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js">
               <Viewer
