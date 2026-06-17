@@ -217,6 +217,7 @@ export default function Home() {
     };
   }, [pdfFile]);
 
+  
   useEffect(() => {
     const handleSelectionChange = () => {
       if (selectionTimeout.current) {
