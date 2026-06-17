@@ -21,8 +21,11 @@ export default function Home() {
   const [showConfirmSmall, setShowConfirmSmall] = useState(false);
   const [pendingExplain, setPendingExplain] = useState<string | null>(null);
   const [pendingExplainPos, setPendingExplainPos] = useState<{ top: number; left: number } | null>(null);
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
   const autoCloseTimer = useRef<number | null>(null);
   const defaultCloseTimer = useRef<number | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const defaultLayoutPluginInstance = defaultLayoutPlugin({ sidebarTabs: () => [] });
   const [dictionary, setNewWordToDicctionary] = useState<{ [key: string]: string }>({});
   const dictionaryRef = useRef<{ [key: string]: string }>({});
@@ -47,6 +50,12 @@ export default function Home() {
   useEffect(() => {
     dictionaryRef.current = dictionary;
   }, [dictionary]);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
 
   const fetchAIResponse = async (
     text: string,
@@ -114,6 +123,43 @@ export default function Home() {
   const closeModal = () => {
     setModalOpen(false);
     setIsFadingOut(false);
+    setChatMessages([]);
+    setChatInput('');
+  };
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim() || isLoading) return;
+    
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsLoading(true);
+console.log('lastSelection', lastSelection);
+    try {
+      const response = await fetch('/api/ai-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          text: userMessage, 
+          type: 'chat',
+          context: modalContent,
+          lastSelection: lastSelection
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: `Error: ${data.error || 'Error al procesar la solicitud'}` }]);
+      } else {
+        setChatMessages(prev => [...prev, { role: 'assistant', content: data.result || 'Sin respuesta' }]);
+      }
+    } catch (error) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Error de red al consultar la IA.' }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const confirmExplain = async () => {
@@ -176,7 +222,7 @@ export default function Home() {
           if (range) {
             const rect = range.getBoundingClientRect();
             if (rect && rect.width && rect.height) {
-              setPendingExplainPos({ top: Math.max(rect.top - 40, 8), left: rect.left + rect.width / 2 });
+              setPendingExplainPos({ top: 20, left: rect.left + rect.width / 2 });
             } else {
               setPendingExplainPos(null);
             }
@@ -351,7 +397,43 @@ export default function Home() {
             </button>
           </div>
           <div className="mt-3 text-sm leading-6 text-slate-800 whitespace-pre-wrap">
-            {isLoading ? 'Cargando respuesta...' : modalContent}
+            {isLoading && chatMessages.length === 0 ? 'Cargando respuesta...' : modalContent}
+          </div>
+          
+          {chatMessages.length > 0 && (
+            <div ref={chatContainerRef} className="mt-4 max-h-64 overflow-y-auto border-t border-slate-200 pt-3">
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                  <div className={`inline-block max-w-xs rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                    msg.role === 'user' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-slate-100 text-slate-800'
+                  }`}>
+                   {msg.content}
+                  </div>
+                </div>
+              ))}
+              {isLoading && <div className="text-xs text-slate-500 text-center">Cargando...</div>}
+            </div>
+          )}
+          
+          <div className="mt-4 flex gap-2 border-t border-slate-200 pt-3">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+              placeholder="Haz una pregunta sobre esto..."
+              className="flex-1 rounded border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              disabled={isLoading}
+            />
+            <button
+              onClick={sendChatMessage}
+              disabled={isLoading || !chatInput.trim()}
+              className="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Enviar
+            </button>
           </div>
         </div>
       )}
