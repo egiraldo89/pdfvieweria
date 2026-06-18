@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Worker, Viewer } from '@react-pdf-viewer/core';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Plugin, ViewerState } from '@react-pdf-viewer/core';
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
-import lodash from 'lodash';
+import VoiceReader from '@/components/VoiceReader';
+import PdfViewerWrapper from '@/components/PdfViewerWrapper';
+import ReaderModal from '@/components/ReaderModal';
+import ReadingMarkerOverlay from '@/components/ReadingMarkerOverlay';
+import SelectionConfirmOverlay from '@/components/SelectionConfirmOverlay';
 
 export default function Home() {
   const [pdfFile, setPdfFile] = useState<string | null>(null);
@@ -25,11 +29,24 @@ export default function Home() {
   const [pendingExplainPos, setPendingExplainPos] = useState<{ top: number; left: number } | null>(null);
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [readingMarkerRect, setReadingMarkerRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const pagesContainerRef = useRef<HTMLDivElement | null>(null);
   const autoCloseTimer = useRef<number | null>(null);
   const defaultCloseTimer = useRef<number | null>(null);
   const markerClearTimer = useRef<number | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const defaultLayoutPluginInstance = defaultLayoutPlugin({ sidebarTabs: () => [] });
+  const viewerStatePlugin = useMemo<Plugin>(() => ({
+    onViewerStateChange: (viewerState: ViewerState) => {
+      setCurrentPageIndex(viewerState.pageIndex);
+      return viewerState;
+    },
+    renderViewer: (props) => {
+      pagesContainerRef.current = props.pagesContainerRef.current;
+      return props.slot;
+    },
+  }), []);
   const [dictionary, setNewWordToDicctionary] = useState<{ [key: string]: string }>({});
   const dictionaryRef = useRef<{ [key: string]: string }>({});
 
@@ -331,57 +348,21 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <main className="flex-1 overflow-hidden flex flex-col">
-        <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md cursor-pointer hover:bg-blue-700 transition-colors text-sm">
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Subir PDF
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
-              {fileName && (
-                <span className="text-sm text-gray-600">
-                  Archivo: <strong>{fileName}</strong>
-                </span>
-              )}
-            </div>
-            {eventMessage && (
-              <div className="text-sm text-blue-600">{eventMessage}</div>
-            )}
-          </div>
-        </div>
+        <VoiceReader
+          fileName={fileName}
+          pdfFile={pdfFile}
+          eventMessage={eventMessage}
+          currentPageIndex={currentPageIndex}
+          onFileUpload={handleFileUpload}
+          onSetEventMessage={setEventMessage}
+          onReadingMarkerRectChange={setReadingMarkerRect}
+        />
 
         {pdfFile ? (
-          <div 
-            className="flex-1 overflow-auto"
-            style={{
-              WebkitTouchCallout: 'none',
-            } as React.CSSProperties}
-          >
-            <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js">
-              <Viewer
-                fileUrl={pdfFile}
-                plugins={[defaultLayoutPluginInstance]}
-              />
-            </Worker>
-          </div>
+          <PdfViewerWrapper
+            pdfFile={pdfFile}
+            plugins={[defaultLayoutPluginInstance, viewerStatePlugin]}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -409,130 +390,30 @@ export default function Home() {
         )}
       </main>
 
-      {modalOpen && (
-        <>
-          <div
-            className={`fixed z-50 mx-auto w-full max-w-[calc(100vw-8rem)] rounded-xl border border-slate-200 bg-white shadow-lg transition-opacity duration-300 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
-            style={
-              modalPosition
-                ? {
-                  top: modalPosition.top,
-                  left: modalPosition.left,
-                  transform: modalPosition?.anchor === 'above' ? 'translate(-50%, -100%)' : 'translateX(-50%)',
-                  position: 'fixed',
-                  width: 'auto',
-                  minWidth: '18rem',
-                  maxWidth: 'calc(100vw - 4rem)',
-                  maxHeight: 'calc(100vh - 2rem)',
-                  WebkitOverflowScrolling: 'touch',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }
-                : {
-                  top: 24,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  maxHeight: 'calc(100vh - 2rem)',
-                  WebkitOverflowScrolling: 'touch',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }
-            }
-          >
-          <div className="border-b border-slate-200 px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900">{modalTitle}</h2>
-                <p className="mt-1 text-xs text-slate-500">Seleccionado: {lastSelection}</p>
-              </div>
-              <button
-                onClick={closeModal}
-                className="rounded-md bg-slate-100 px-2 py-1 text-sm text-slate-700 hover:bg-slate-200"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto px-4 py-3">
-            <div className="text-sm leading-6 text-slate-800 whitespace-pre-wrap">
-              {isLoading && chatMessages.length === 0 ? 'Cargando respuesta...' : modalContent}
-            </div>
-            {modalType === 'explain' && chatMessages.length > 0 && (
-              <div ref={chatContainerRef} className="mt-4 max-h-64 overflow-y-auto border-t border-slate-200 pt-3">
-                {chatMessages.map((msg, idx) => (
-                  <div key={idx} className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                    <div className={`inline-block max-w-xs rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
-                      msg.role === 'user' 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-slate-100 text-slate-800'
-                    }`}>
-                     {msg.content}
-                    </div>
-                  </div>
-                ))}
-                {isLoading && <div className="text-xs text-slate-500 text-center">Cargando...</div>}
-              </div>
-            )}
-          </div>
-          {modalType === 'explain' && (
-            <div className="border-t border-slate-200 px-4 py-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-                  placeholder="Haz una pregunta sobre esto..."
-                  className="flex-1 min-w-0 rounded border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
-                  disabled={isLoading}
-                />
-                <button
-                  onClick={sendChatMessage}
-                  disabled={isLoading || !chatInput.trim()}
-                  className="flex-shrink-0 rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Enviar
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </>
-      )}
+      <ReaderModal
+        modalOpen={modalOpen}
+        isFadingOut={isFadingOut}
+        modalTitle={modalTitle}
+        modalContent={modalContent}
+        lastSelection={lastSelection}
+        isLoading={isLoading}
+        chatMessages={chatMessages}
+        chatInput={chatInput}
+        modalType={modalType}
+        chatContainerRef={chatContainerRef}
+        onChatInputChange={setChatInput}
+        onSendChatMessage={sendChatMessage}
+        onClose={closeModal}
+      />
 
-      {textMarkerPos && (
-        <div
-          className="fixed z-40 h-3 w-3 rounded-full bg-blue-600 shadow-lg"
-          style={{
-            top: textMarkerPos.top,
-            left: textMarkerPos.left,
-            transform: 'translate(-50%, -50%)',
-          }}
-        />
-      )}
-
-      {showConfirmSmall && pendingExplain && (
-        <div
-          className="fixed z-50"
-          style={
-            pendingExplainPos
-              ? {
-                top: pendingExplainPos.top,
-                left: pendingExplainPos.left,
-                transform: 'translateX(-50%)',
-              }
-              : { top: 120, left: '50%', transform: 'translateX(-50%)' }
-          }
-        >
-          <div className="bg-white border border-slate-200 rounded-md p-3 shadow-md w-56 text-center">
-            <div className="text-sm text-slate-700 mb-2">Solicitar explicación para la selección?</div>
-            <div className="flex justify-center gap-2">
-              <button onClick={confirmExplain} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">OK</button>
-              <button onClick={cancelExplain} className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-sm">Cancelar</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReadingMarkerOverlay textMarkerPos={textMarkerPos} readingMarkerRect={readingMarkerRect} />
+      <SelectionConfirmOverlay
+        showConfirmSmall={showConfirmSmall}
+        pendingExplain={pendingExplain}
+        pendingExplainPos={pendingExplainPos}
+        onConfirmExplain={confirmExplain}
+        onCancelExplain={cancelExplain}
+      />
     </div>
   );
 }
