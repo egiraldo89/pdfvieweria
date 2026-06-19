@@ -143,13 +143,13 @@ export default function ReaderModal({
   return (
     <>
       <div
-        className={`fixed z-50 mx-auto rounded-xl border border-slate-200 bg-white shadow-lg transition-opacity duration-300 ${modalType === 'translate' || modalType === 'explain' ? 'reader-modal-full-width' : ''} ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
+        className={`fixed z-50 mx-auto rounded-xl border border-slate-200 bg-white shadow-lg transition-opacity duration-300 ${modalType === 'explain' ? 'reader-modal-full-width' : ''} ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
         style={{
           ...positionStyle,
           position: 'fixed',
-          width: 'auto',
-          minWidth: '18rem',
-          maxWidth: 'calc(100vw - 4rem)',
+          width: modalType === 'explain' ? 'calc(100vw - 2rem)' : 'auto',
+          minWidth: modalType === 'translate' ? '12rem' : '18rem',
+          maxWidth: modalType === 'translate' ? '22rem' : 'calc(100vw - 4rem)',
           maxHeight: 'calc(100vh - 2rem)',
           WebkitOverflowScrolling: 'touch',
           display: 'flex',
