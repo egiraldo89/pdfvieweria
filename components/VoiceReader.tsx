@@ -148,6 +148,13 @@ export default function VoiceReader({
     return getTextDataFromLayer(textLayer);
   };
 
+  const getSelectedText = () => {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+    return window.getSelection()?.toString().trim() || '';
+  };
+
   const speakPageText = (
     text: string,
     spanInfos: Array<{ span: HTMLElement; text: string; start: number; end: number }>,
@@ -243,6 +250,13 @@ export default function VoiceReader({
   };
 
   const startReadingCurrentPage = () => {
+    const selectedText = getSelectedText();
+    if (selectedText) {
+      onSetEventMessage('Leyendo selección...');
+      speakPageText(selectedText, []);
+      return;
+    }
+
     const pageData = getCurrentPageTextData();
     if (!pageData || !pageData.fullText) {
       onSetEventMessage(

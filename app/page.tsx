@@ -36,7 +36,9 @@ export default function Home() {
   const defaultCloseTimer = useRef<number | null>(null);
   const markerClearTimer = useRef<number | null>(null);
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
-  const defaultLayoutPluginInstance = defaultLayoutPlugin({ sidebarTabs: () => [] });
+  const defaultLayoutPluginInstance = defaultLayoutPlugin({
+    sidebarTabs: () => [],
+  });
   const viewerStatePlugin = useMemo<Plugin>(() => ({
     onViewerStateChange: (viewerState: ViewerState) => {
       setCurrentPageIndex(viewerState.pageIndex);
@@ -100,6 +102,10 @@ export default function Home() {
     }
 
     try {
+      if (type === 'explain') {
+        setModalPosition(null);
+      }
+
       const response = await fetch('/api/ai', {
         method: 'POST',
         headers: {
@@ -141,6 +147,7 @@ export default function Home() {
   const closeModal = () => {
     setModalOpen(false);
     setIsFadingOut(false);
+    setModalPosition(null);
     setChatMessages([]);
     setChatInput('');
     
@@ -254,6 +261,26 @@ export default function Home() {
         if (translation) {
           setLastSelection(selection);
           setModalContent(translation);
+
+          const range = window.getSelection()?.getRangeAt(0);
+          if (range) {
+            const rect = range.getBoundingClientRect();
+            if (rect && rect.width && rect.height) {
+              const centerX = rect.left + rect.width / 2;
+              const minLeft = 160;
+              const maxLeft = Math.max(window.innerWidth - 160, 160);
+              setModalPosition({
+                top: rect.top + 4,
+                left: Math.min(Math.max(centerX, minLeft), maxLeft),
+                anchor: 'above',
+              });
+            } else {
+              setModalPosition(null);
+            }
+          } else {
+            setModalPosition(null);
+          }
+
           setModalOpen(true);
           setIsLoading(false);
           return;
@@ -292,12 +319,12 @@ export default function Home() {
           const range = window.getSelection()?.getRangeAt(0);
           if (range) {
             const rect = range.getBoundingClientRect();
-              if (rect && rect.width && rect.height) {
+            if (rect && rect.width && rect.height) {
               const centerX = rect.left + rect.width / 2;
               const minLeft = 160;
               const maxLeft = Math.max(window.innerWidth - 160, 160);
               setModalPosition({
-                top: rect.top,
+                top: rect.top + 4,
                 left: Math.min(Math.max(centerX, minLeft), maxLeft),
                 anchor: 'above',
               });
@@ -400,6 +427,7 @@ export default function Home() {
         chatMessages={chatMessages}
         chatInput={chatInput}
         modalType={modalType}
+        modalPosition={modalPosition}
         chatContainerRef={chatContainerRef}
         onChatInputChange={setChatInput}
         onSendChatMessage={sendChatMessage}

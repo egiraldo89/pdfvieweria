@@ -1,6 +1,6 @@
 'use client';
 
-import { RefObject } from 'react';
+import { RefObject, useEffect, useState } from 'react';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -17,6 +17,7 @@ interface ReaderModalProps {
   chatMessages: ChatMessage[];
   chatInput: string;
   modalType: 'translate' | 'explain';
+  modalPosition: { top: number; left: number; anchor?: 'above' | 'center' } | null;
   chatContainerRef: RefObject<HTMLDivElement | null>;
   onChatInputChange: (value: string) => void;
   onSendChatMessage: () => void;
@@ -33,23 +34,118 @@ export default function ReaderModal({
   chatMessages,
   chatInput,
   modalType,
+  modalPosition,
   chatContainerRef,
   onChatInputChange,
   onSendChatMessage,
   onClose,
 }: ReaderModalProps) {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setSpeechSupported(false);
+      return;
+    }
+
+    const supportsSpeech =
+      'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+    setSpeechSupported(supportsSpeech);
+
+    const handleVoicesChanged = () => {
+      setSpeechSupported(
+        'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window
+      );
+    };
+
+    if (supportsSpeech && 'speechSynthesis' in window) {
+      window.speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
+    }
+
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+      }
+    };
+  }, []);
+
   if (!modalOpen) {
     return null;
   }
 
+  const getEnglishVoice = () => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return null;
+    }
+
+    const voices = window.speechSynthesis.getVoices();
+    return (
+      voices.find((voice) => voice.lang.toLowerCase().startsWith('en-us')) ||
+      voices.find((voice) => voice.lang.toLowerCase().startsWith('en')) ||
+      voices[0] ||
+      null
+    );
+  };
+
+  const stopSpeaking = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  };
+
+  const pronounceSelection = () => {
+    if (!speechSupported || !lastSelection.trim()) {
+      return;
+    }
+
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      return;
+    }
+
+    stopSpeaking();
+
+    const utterance = new SpeechSynthesisUtterance(lastSelection.trim());
+    utterance.lang = 'en-US';
+    const voice = getEnglishVoice();
+    if (voice) {
+      utterance.voice = voice;
+    }
+    utterance.rate = 1;
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+  };
+
+  const positionStyle = modalPosition
+    ? {
+        top: modalPosition.top,
+        left: modalPosition.left,
+        transform:
+          modalPosition.anchor === 'above'
+            ? 'translate(-50%, -100%)'
+            : 'translateX(-50%)',
+      }
+    : {
+        top: 24,
+        left: '50%',
+        transform: 'translateX(-50%)',
+      };
+
   return (
     <>
       <div
-        className={`fixed z-50 mx-auto w-full max-w-[calc(100vw-8rem)] rounded-xl border border-slate-200 bg-white shadow-lg transition-opacity duration-300 ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
+        className={`fixed z-50 mx-auto rounded-xl border border-slate-200 bg-white shadow-lg transition-opacity duration-300 ${modalType === 'translate' || modalType === 'explain' ? 'reader-modal-full-width' : ''} ${isFadingOut ? 'opacity-0' : 'opacity-100'}`}
         style={{
-          top: 24,
-          left: '50%',
-          transform: 'translateX(-50%)',
+          ...positionStyle,
           position: 'fixed',
           width: 'auto',
           minWidth: '18rem',
@@ -63,7 +159,31 @@ export default function ReaderModal({
         <div className="border-b border-slate-200 px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-slate-900">{modalTitle}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-slate-900">{modalTitle}</h2>
+                {modalType === 'translate' && speechSupported && lastSelection.trim() && (
+                  <button
+                    type="button"
+                    onClick={pronounceSelection}
+                    title={isSpeaking ? 'Detener audio' : 'Reproducir pronunciación'}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-5 w-5"
+                    >
+                      <path d="M11 5 6 9H2v6h4l5 4V5z" />
+                      <path d="M15.54 8.46a5 5 0 010 7.07" />
+                      <path d="M19 5a9 9 0 010 14" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <p className="mt-1 text-xs text-slate-500">Seleccionado: {lastSelection}</p>
             </div>
             <button

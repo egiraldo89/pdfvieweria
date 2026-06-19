@@ -14,7 +14,7 @@ interface ReaderToolbarProps {
   onSetSpeechRate: (rate: number) => void;
 }
 
-const speedOptions = [0.75, 1, 1.25, 1.5];
+const speedOptions = [0.5,0.75, 1, 1.25, 1.5];
 
 export default function ReaderToolbar({
   fileName,
