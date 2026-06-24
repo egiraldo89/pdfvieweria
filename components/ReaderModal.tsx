@@ -42,6 +42,37 @@ export default function ReaderModal({
 }: ReaderModalProps) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [notifyMessage, setNotifyMessage] = useState('');
+
+  const handleNotify = async () => {
+    setNotifyLoading(true);
+    setNotifyMessage('');
+    try {
+      const response = await fetch('/api/notify-word', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          word: lastSelection,
+          translation: modalContent,
+          timestamp: Date.now(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al guardar la notificación');
+      }
+
+      setNotifyMessage('✓ Guardado exitosamente');
+      setTimeout(() => setNotifyMessage(''), 2000);
+    } catch (error) {
+      console.error('Error en handleNotify:', error);
+      setNotifyMessage('✗ Error al guardar');
+      setTimeout(() => setNotifyMessage(''), 2000);
+    } finally {
+      setNotifyLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -186,12 +217,28 @@ export default function ReaderModal({
               </div>
               <p className="mt-1 text-xs text-slate-500">Seleccionado: {lastSelection}</p>
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-md bg-slate-100 px-2 py-1 text-sm text-slate-700 hover:bg-slate-200"
-            >
-              Cerrar
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              {modalType === 'translate' && (
+                <button
+                  onClick={handleNotify}
+                  disabled={notifyLoading || isLoading}
+                  className="rounded-md bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {notifyLoading ? 'Guardando...' : 'Notificarme'}
+                </button>
+              )}
+              {notifyMessage && (
+                <div className={`text-xs font-medium ${notifyMessage.includes('✓') ? 'text-green-600' : 'text-red-600'}`}>
+                  {notifyMessage}
+                </div>
+              )}
+              <button
+                onClick={onClose}
+                className="rounded-md bg-slate-100 px-2 py-1 text-sm text-slate-700 hover:bg-slate-200"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
 
