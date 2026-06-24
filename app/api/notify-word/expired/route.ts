@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'No hay registros vencidos' }, { status: 200 });
     }
 
-    
+
     const subsResult = await pool.query('SELECT id, subscription FROM push_subscriptions');
     const subscriptions = subsResult.rows;
     const firstRow = result.rows[0];
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     const sendPromises = subscriptions.map(async (subRow: { id: number; subscription: any }) => {
       try {
         await webpush.sendNotification(subRow.subscription, payload);
-      } catch (sendError) {
+      } catch (sendError : any) {
         console.error('Error enviando push a suscripción', subRow.id, sendError);
         const status = sendError?.statusCode ?? sendError?.status;
         if (status === 410 || status === 404) {
