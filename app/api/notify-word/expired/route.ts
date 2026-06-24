@@ -20,7 +20,9 @@ export async function GET(req: NextRequest) {
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
     const pool = new Pool({ connectionString: databaseUrl });
-    const nowMs = Date.now();
+    const now = new Date();
+    const colombiaTime = new Date(now.toLocaleString('es-CO', { timeZone: 'America/Bogota' }));
+    const nowMs = colombiaTime.getTime();
 
     const result = await pool.query(
       'UPDATE word_notifications SET created_at = created_at + $1 WHERE created_at < $2 RETURNING id, word, translation, created_at',
