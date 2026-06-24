@@ -35,30 +35,28 @@ export async function GET(req: NextRequest) {
 
     const subsResult = await pool.query('SELECT id, subscription FROM push_subscriptions');
     const subscriptions = subsResult.rows;
-    const firstRow = result.rows[0];
-    const bodyText = result.rows.length === 1
-      ? `${firstRow.word}: ${firstRow.translation}`
-      : `${firstRow.word}: ${firstRow.translation} (+${result.rows.length - 1} más)`;
 
-    const payload = JSON.stringify({
-      title: 'Remember Word',
-      body: bodyText,
-      data: {
-        records: result.rows,
-      },
-    });
+    const sendPromises = subscriptions.flatMap((subRow: { id: number; subscription: any }) =>
+      result.rows.map(async (row) => {
+        const payload = JSON.stringify({
+          title: 'Remember Word',
+          body: `${row.word}: ${row.translation}`,
+          data: {
+            record: row,
+          },
+        });
 
-    const sendPromises = subscriptions.map(async (subRow: { id: number; subscription: any }) => {
-      try {
-        await webpush.sendNotification(subRow.subscription, payload);
-      } catch (sendError : any) {
-        console.error('Error enviando push a suscripción', subRow.id, sendError);
-        const status = sendError?.statusCode ?? sendError?.status;
-        if (status === 410 || status === 404) {
-          await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [subRow.id]);
+        try {
+          await webpush.sendNotification(subRow.subscription, payload);
+        } catch (sendError : any) {
+          console.error('Error enviando push a suscripción', subRow.id, sendError);
+          const status = sendError?.statusCode ?? sendError?.status;
+          if (status === 410 || status === 404) {
+            await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [subRow.id]);
+          }
         }
-      }
-    });
+      })
+    );
 
     await Promise.all(sendPromises);
     await pool.end();
