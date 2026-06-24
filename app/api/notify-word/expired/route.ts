@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'No hay registros vencidos' }, { status: 200 });
     }
 
+    
     const subsResult = await pool.query('SELECT id, subscription FROM push_subscriptions');
     const subscriptions = subsResult.rows;
     const firstRow = result.rows[0];
