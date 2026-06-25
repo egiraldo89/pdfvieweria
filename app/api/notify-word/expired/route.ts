@@ -29,6 +29,7 @@ console.log('Current Colombia time (ms):', nowMs);
       'SELECT id, word, translation, created_at FROM word_notifications WHERE created_at < $1 ORDER BY created_at ASC',
       [nowMs]
     );
+    console.log('Pending notifications:', notifResult.rows.length, notifResult.rows);
     if (notifResult.rows.length === 0) {
       await pool.end();
       return NextResponse.json({ success: true, message: 'No hay registros vencidos' }, { status: 200 });
