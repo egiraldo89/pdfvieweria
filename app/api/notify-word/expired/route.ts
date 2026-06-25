@@ -20,50 +20,60 @@ export async function GET(req: NextRequest) {
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
     const pool = new Pool({ connectionString: databaseUrl });
-    const now = new Date();
-    const colombiaTime = new Date(now.toLocaleString('es-CO', { timeZone: 'America/Bogota' }));
-    const nowMs = colombiaTime.getTime();
 
-    const result = await pool.query(
-      'UPDATE word_notifications SET created_at = created_at + $1 WHERE created_at < $2 RETURNING id, word, translation, created_at',
-      [24 * 60 * 60 * 1000, nowMs]
+    // Calculate Colombia time by applying UTC offset for America/Bogota (UTC-5)
+    const nowMs = Date.now() - 5 * 60 * 60 * 1000;
+console.log('Current Colombia time (ms):', nowMs);
+    // 1) Select pending word notifications (do not update yet)
+    const notifResult = await pool.query(
+      'SELECT id, word, translation, created_at FROM word_notifications WHERE created_at < $1 ORDER BY created_at ASC',
+      [nowMs]
     );
-
-    if (result.rows.length === 0) {
+    if (notifResult.rows.length === 0) {
       await pool.end();
       return NextResponse.json({ success: true, message: 'No hay registros vencidos' }, { status: 200 });
     }
 
-
+    // 2) Load subscriptions
     const subsResult = await pool.query('SELECT id, subscription FROM push_subscriptions');
     const subscriptions = subsResult.rows;
 
-    const sendPromises = subscriptions.flatMap((subRow: { id: number; subscription: any }) =>
-      result.rows.map(async (row) => {
-        const payload = JSON.stringify({
-          title: 'Remember Word',
-          body: `${row.word}: ${row.translation}`,
-          data: {
-            record: row,
-          },
-        });
+    // 3) Send one notification per word to every subscription
+    const failedSubIds = new Set<number>();
+    for (const row of notifResult.rows) {
+      const payload = JSON.stringify({
+        title: 'Remember Word',
+        body: `${row.word}: ${row.translation}`,
+        data: { record: row },
+      });
 
+      for (const subRow of subscriptions) {
         try {
           await webpush.sendNotification(subRow.subscription, payload);
-        } catch (sendError : any) {
+        } catch (sendError: any) {
           console.error('Error enviando push a suscripción', subRow.id, sendError);
           const status = sendError?.statusCode ?? sendError?.status;
           if (status === 410 || status === 404) {
-            await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [subRow.id]);
+            failedSubIds.add(subRow.id);
           }
         }
-      })
-    );
+      }
+    }
 
-    await Promise.all(sendPromises);
+    // 4) Remove invalid subscriptions
+    if (failedSubIds.size > 0) {
+      const ids = Array.from(failedSubIds);
+      await pool.query('DELETE FROM push_subscriptions WHERE id = ANY($1)', [ids]);
+    }
+
+    // 5) After attempted sends, advance each notified word by 24 hours
+    const notifiedIds = notifResult.rows.map((r: any) => r.id);
+    if (notifiedIds.length > 0) {
+      await pool.query('UPDATE word_notifications SET created_at = created_at + $1 WHERE id = ANY($2)', [24 * 60 * 60 * 1000, notifiedIds]);
+    }
+
     await pool.end();
-
-    return NextResponse.json({ success: true, notified: true }, { status: 200 });
+    return NextResponse.json({ success: true, notified: true, count: notifResult.rows.length }, { status: 200 });
   } catch (error) {
     console.error('Error en notify-word/expired:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
