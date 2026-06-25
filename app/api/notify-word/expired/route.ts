@@ -41,25 +41,31 @@ console.log('Current Colombia time (ms):', nowMs);
 
     // 3) Send one notification per word to every subscription
     const failedSubIds = new Set<number>();
+    const sendTasks: Promise<void>[] = [];
+
     for (const row of notifResult.rows) {
       const payload = JSON.stringify({
         title: 'Remember Word',
-        body: `${row.word}: ${row.translation}`,
+        body: `**${row.word}**: ${row.translation}`,
         data: { record: row },
       });
 
       for (const subRow of subscriptions) {
-        try {
-          await webpush.sendNotification(subRow.subscription, payload);
-        } catch (sendError: any) {
-          console.error('Error enviando push a suscripción', subRow.id, sendError);
-          const status = sendError?.statusCode ?? sendError?.status;
-          if (status === 410 || status === 404) {
-            failedSubIds.add(subRow.id);
+        sendTasks.push((async () => {
+          try {
+            await webpush.sendNotification(subRow.subscription, payload);
+          } catch (sendError: any) {
+            console.error('Error enviando push a suscripción', subRow.id, sendError);
+            const status = sendError?.statusCode ?? sendError?.status;
+            if (status === 410 || status === 404) {
+              failedSubIds.add(subRow.id);
+            }
           }
-        }
+        })());
       }
     }
+
+    await Promise.allSettled(sendTasks);
 
     // 4) Remove invalid subscriptions
     if (failedSubIds.size > 0) {
