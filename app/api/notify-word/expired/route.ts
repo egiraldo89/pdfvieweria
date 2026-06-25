@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const pool = new Pool({ connectionString: databaseUrl });
 
     // Calculate Colombia time by applying UTC offset for America/Bogota (UTC-5)
-    const nowMs = Date.now() - 5 * 60 * 60 * 1000;
+    const nowMs = Date.now() //- 5 * 60 * 60 * 1000;
 console.log('Current Colombia time (ms):', nowMs);
     // 1) Select pending word notifications (do not update yet)
     const notifResult = await pool.query(
