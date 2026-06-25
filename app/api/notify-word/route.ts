@@ -37,8 +37,9 @@ export async function POST(req: NextRequest) {
     `);
 
     // Insertar el registro
-    const baseTs = typeof timestamp === 'number' ? timestamp : Date.now();
-    const timestampMs = baseTs + 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const baseTs = typeof timestamp === 'number' ? timestamp : new Date(now.toLocaleString('es-CO', { timeZone: 'America/Bogota' }));
+    const timestampMs = baseTs;
     await pool.query(
       'INSERT INTO word_notifications (word, translation, created_at) VALUES ($1, $2, $3)',
       [word, translation, timestampMs]
