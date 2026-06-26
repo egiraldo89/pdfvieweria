@@ -344,7 +344,7 @@ export default function Home() {
               const minLeft = 160;
               const maxLeft = Math.max(window.innerWidth - 160, 160);
               setModalPosition({
-                top: rect.top + 4,
+                top: Math.max(rect.top - 26, 8),
                 left: Math.min(Math.max(centerX, minLeft), maxLeft),
                 anchor: 'above',
               });
@@ -398,7 +398,7 @@ export default function Home() {
               const minLeft = 160;
               const maxLeft = Math.max(window.innerWidth - 160, 160);
               setModalPosition({
-                top: rect.top + 4,
+                top: Math.max(rect.top - 26, 8),
                 left: Math.min(Math.max(centerX, minLeft), maxLeft),
                 anchor: 'above',
               });

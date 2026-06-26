@@ -24,8 +24,16 @@ export async function POST(req: NextRequest) {
       )
     `);
 
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_endpoint_unique
+      ON push_subscriptions ((subscription ->> 'endpoint'))
+    `);
+
     await pool.query(
-      'INSERT INTO push_subscriptions (subscription, created_at) VALUES ($1, $2)',
+      `INSERT INTO push_subscriptions (subscription, created_at)
+       VALUES ($1, $2)
+       ON CONFLICT ((subscription ->> 'endpoint'))
+       DO UPDATE SET created_at = EXCLUDED.created_at`,
       [subscription, Date.now()]
     );
 
