@@ -19,6 +19,18 @@ export default function PushNotificationPanel({ notification, onStop, onClose }:
     return null;
   }
 
+  const playPronunciation = () => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !notification.word) {
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(notification.word);
+    utterance.lang = 'en-US';
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
+  };
+
   return (
     <div className="fixed bottom-4 right-4 z-[60] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
       <div className="flex items-start justify-between gap-3">
@@ -42,7 +54,14 @@ export default function PushNotificationPanel({ notification, onStop, onClose }:
         </button>
       </div>
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <button
+          type="button"
+          onClick={playPronunciation}
+          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          🔊 Escuchar
+        </button>
         <button
           type="button"
           onClick={() => onStop(notification.id)}
