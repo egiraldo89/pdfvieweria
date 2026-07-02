@@ -47,11 +47,6 @@ export async function GET(req: NextRequest) {
                 title: 'Remember Word',
                 body: `*${row.word}*: ${row.translation}`,
                 data: { record: row },
-                actions: [
-                    { action: 'stop', title: 'Stop' }
-                ],
-                tag: 'remember-word',
-                requireInteraction: true,
             });
 
             console.log('subscriptions:', subscriptions.length);

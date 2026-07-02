@@ -10,6 +10,7 @@ import PdfViewerWrapper from '@/components/PdfViewerWrapper';
 import ReaderModal from '@/components/ReaderModal';
 import ReadingMarkerOverlay from '@/components/ReadingMarkerOverlay';
 import SelectionConfirmOverlay from '@/components/SelectionConfirmOverlay';
+import PushNotificationPanel from '@/components/PushNotificationPanel';
 
 export default function Home() {
   const [pdfFile, setPdfFile] = useState<string | null>(null);
@@ -31,6 +32,13 @@ export default function Home() {
   const [chatInput, setChatInput] = useState('');
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [readingMarkerRect, setReadingMarkerRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const [pushNotification, setPushNotification] = useState<{
+    id: number;
+    title: string;
+    body: string;
+    word?: string;
+    translation?: string;
+  } | null>(null);
   const pagesContainerRef = useRef<HTMLDivElement | null>(null);
   const autoCloseTimer = useRef<number | null>(null);
   const defaultCloseTimer = useRef<number | null>(null);
@@ -101,20 +109,33 @@ export default function Home() {
     }
   };
 
+  const stopPushNotification = async (id: number) => {
+    try {
+      await fetch('/api/notify-word/stop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      setPushNotification(null);
+    } catch (error) {
+      console.error('Error al detener notificación:', error);
+    }
+  };
+
   useEffect(() => {
     subscribeToPushNotifications();
 
     const handlePushMessage = (event: MessageEvent) => {
       if (event.data?.type === 'PUSH_NOTIFICATION_CLICKED') {
-        const records = event.data.data?.records || [];
-        if (records.length > 0 && typeof window !== 'undefined') {
-          const firstRecord = records[0];
-          const utteranceEn = new SpeechSynthesisUtterance(firstRecord.word);
-          const utteranceEs = new SpeechSynthesisUtterance(firstRecord.translation);
-          utteranceEn.lang = 'en-US';
-          utteranceEs.lang = 'es-ES';
-          window.speechSynthesis.speak(utteranceEn);
-          window.speechSynthesis.speak(utteranceEs);
+        const record = event.data?.data?.record;
+        if (record?.id) {
+          setPushNotification({
+            id: record.id,
+            title: 'Notificación activa',
+            body: record.translation ? `${record.word}: ${record.translation}` : 'Esta notificación puede detenerse desde aquí.',
+            word: record.word,
+            translation: record.translation,
+          });
         }
       }
     };
@@ -515,6 +536,11 @@ export default function Home() {
         pendingExplainPos={pendingExplainPos}
         onConfirmExplain={confirmExplain}
         onCancelExplain={cancelExplain}
+      />
+      <PushNotificationPanel
+        notification={pushNotification}
+        onStop={stopPushNotification}
+        onClose={() => setPushNotification(null)}
       />
     </div>
   );
