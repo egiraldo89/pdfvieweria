@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
         console.log('Current Colombia time (ms):', nowMs);
         // 1) Select pending word notifications (do not update yet)
         const notifResult = await pool.query(
-            'SELECT id, word, translation, created_at FROM word_notifications WHERE created_at < $1 ORDER BY created_at ASC',
+            'SELECT id, word, translation, created_at FROM word_notifications WHERE created_at < $1 AND active = true ORDER BY created_at ASC',
             [nowMs]
         );
         console.log('Pending notifications:', notifResult.rows.length, notifResult.rows);
@@ -47,12 +47,18 @@ export async function GET(req: NextRequest) {
                 title: 'Remember Word',
                 body: `*${row.word}*: ${row.translation}`,
                 data: { record: row },
+                actions: [
+                    { action: 'stop', title: 'Stop' }
+                ],
+                tag: 'remember-word',
+                requireInteraction: true,
             });
 
+            console.log('subscriptions:', subscriptions.length);
             for (const subRow of subscriptions) {
                 sendTasks.push((async () => {
                     try {
-                        await webpush.sendNotification(subRow.subscription, payload);
+                       await webpush.sendNotification(subRow.subscription, payload);
                     } catch (sendError: any) {
                         console.error('Error enviando push a suscripción', subRow.id, sendError);
                         const status = sendError?.statusCode ?? sendError?.status;

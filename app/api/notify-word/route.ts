@@ -26,23 +26,13 @@ export async function POST(req: NextRequest) {
       connectionString: databaseUrl,
     });
 
-    // Crear tabla si no existe
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS word_notifications (
-        id SERIAL PRIMARY KEY,
-        word VARCHAR(255) NOT NULL,
-        translation TEXT NOT NULL,
-        created_at BIGINT NOT NULL
-      )
-    `);
-
     // Insertar el registro
     const now = new Date();
     const baseTs = typeof timestamp === 'number' ? timestamp : new Date(now.toLocaleString('es-CO', { timeZone: 'America/Bogota' }));
     const timestampMs = baseTs;
     await pool.query(
-      'INSERT INTO word_notifications (word, translation, created_at) VALUES ($1, $2, $3)',
-      [word, translation, timestampMs]
+      'INSERT INTO word_notifications (word, translation, created_at, active) VALUES ($1, $2, $3, $4)',
+      [word, translation, timestampMs, true]
     );
 
     await pool.end();
