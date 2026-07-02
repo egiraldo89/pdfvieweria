@@ -1,5 +1,7 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 interface NotificationPayload {
   id: number;
   title: string;
@@ -15,6 +17,8 @@ interface PushNotificationPanelProps {
 }
 
 export default function PushNotificationPanel({ notification, onStop, onClose }: PushNotificationPanelProps) {
+  const router = useRouter();
+
   if (!notification) {
     return null;
   }
@@ -54,21 +58,30 @@ export default function PushNotificationPanel({ notification, onStop, onClose }:
         </button>
       </div>
 
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={playPronunciation}
-          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="text-xl text-slate-400 hover:text-slate-600"
         >
-          🔊 Escuchar
+          🔊
         </button>
-        <button
-          type="button"
-          onClick={() => onStop(notification.id)}
-          className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-        >
-          Parar notificación
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => router.push('/notified-words')}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Ver palabras notificadas
+          </button>
+          <button
+            type="button"
+            onClick={() => onStop(notification.id)}
+            className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Parar notificación
+          </button>
+        </div>
       </div>
     </div>
   );

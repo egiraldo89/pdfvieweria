@@ -32,6 +32,7 @@ export default function Home() {
   const [chatInput, setChatInput] = useState('');
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [readingMarkerRect, setReadingMarkerRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
   const [pushNotification, setPushNotification] = useState<{
     id: number;
     title: string;
@@ -483,6 +484,34 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
+      <header className="flex items-center justify-end border-b border-slate-200 bg-white px-4 py-3">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowHeaderMenu((prev) => !prev)}
+            className="rounded-full p-2 text-slate-700 hover:bg-slate-100"
+            aria-label="Abrir menú"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="5" cy="12" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="19" cy="12" r="1.5" />
+            </svg>
+          </button>
+
+          {showHeaderMenu && (
+            <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+              <a
+                href="/notified-words"
+                className="flex items-center rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+              >
+                Palabras notificadas
+              </a>
+            </div>
+          )}
+        </div>
+      </header>
+
       <main className="flex-1 overflow-hidden flex flex-col">
         <VoiceReader
           fileName={fileName}
