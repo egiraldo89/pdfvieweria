@@ -122,23 +122,37 @@ export default function Home() {
     }
   };
 
+  const openPushNotificationPanel = (record: any) => {
+    if (!record?.id) return;
+    setPushNotification({
+      id: record.id,
+      title: 'Notificación activa',
+      body: record.translation ? `${record.word}: ${record.translation}` : 'Esta notificación puede detenerse desde aquí.',
+      word: record.word,
+      translation: record.translation,
+    });
+  };
+
   useEffect(() => {
     subscribeToPushNotifications();
 
     const handlePushMessage = (event: MessageEvent) => {
       if (event.data?.type === 'PUSH_NOTIFICATION_CLICKED') {
         const record = event.data?.data?.record;
-        if (record?.id) {
-          setPushNotification({
-            id: record.id,
-            title: 'Notificación activa',
-            body: record.translation ? `${record.word}: ${record.translation}` : 'Esta notificación puede detenerse desde aquí.',
-            word: record.word,
-            translation: record.translation,
-          });
-        }
+        openPushNotificationPanel(record);
       }
     };
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('push') === '1') {
+      const record = {
+        id: Number(params.get('pushId') || '0'),
+        word: params.get('pushWord') || '',
+        translation: params.get('pushTranslation') || '',
+      };
+      openPushNotificationPanel(record);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
     navigator.serviceWorker.addEventListener('message', handlePushMessage);
 
